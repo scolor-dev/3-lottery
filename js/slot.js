@@ -1,5 +1,6 @@
 // js/slot.js
 import { noiseBurst, tone, riser } from "./audio.js";
+import { clearFxClasses } from "./effects.js";
 import {
   win777,
   win333,
@@ -37,6 +38,7 @@ export function isSpinning() {
 }
 
 export function startSpin() {
+  clearFxClasses();
   if (spinning) return;
   spinning = true;
 
@@ -101,37 +103,74 @@ function getStraightType([a,b,c]) {
 }
 
 function checkWin() {
-  const [a,b,c] = getDigits();
+  const [a, b, c] = getDigits();
+
+  // kind を決める（履歴用）
+  let kind = "lose";
 
   // 3つ揃い
-  if (a === 7 && b === 7 && c === 7) return win777();
-  if (a === 3 && b === 3 && c === 3) return win333();
+  if (a === 7 && b === 7 && c === 7) kind = "777";
+  else if (a === 3 && b === 3 && c === 3) kind = "333";
+  else {
+    // 連番
+    const straight = getStraightType([a, b, c]);
+    if (straight === "up") kind = "straight_up";
+    else if (straight === "down") kind = "straight_down";
+    else {
+      // ゾロ目（777/333以外）
+      if (a === b && b === c) kind = "zorome";
+      else {
+        // ペア
+        const isPair =
+          (a === b && b !== c) ||
+          (a === c && b !== a) ||
+          (b === c && a !== b);
 
-  // 連番
-  const straight = getStraightType([a,b,c]);
-  if (straight) return winStraight(straight, a);
+        if (isPair) {
+          const pairNum =
+            a === b ? a :
+            a === c ? a :
+            b;
 
-  // ゾロ目
-  if (a === b && b === c) return winZorome(a);
-
-  // ペア
-  if (
-    (a === b && b !== c) ||
-    (a === c && b !== a) ||
-    (b === c && a !== b)
-  ) {
-    const pairNum =
-      a === b ? a :
-      a === c ? a :
-      b;
-
-    if (pairNum === 7) return winPair7();
-    if (pairNum === 3) return winPair3();
-    return winPair(pairNum);
+          if (pairNum === 7) kind = "pair7";
+          else if (pairNum === 3) kind = "pair3";
+          else kind = "pair";
+        } else {
+          // どれにも該当せず、3を含む
+          if (a === 3 || b === 3 || c === 3) kind = "green";
+        }
+      }
+    }
   }
 
-  // ★ どれにも該当せず、3を含む
-  if (a === 3 || b === 3 || c === 3) {
-    return winGreen();
+  // 演出（kind に応じて呼ぶ）
+  switch (kind) {
+    case "777": win777(); break;
+    case "333": win333(); break;
+    case "straight_up": winStraight("up", a); break;
+    case "straight_down": winStraight("down", a); break;
+    case "zorome": winZorome(a); break;
+    case "pair7": winPair7(); break;
+    case "pair3": winPair3(); break;
+    case "pair": {
+      // 元の winPair は数字で音が変わる想定なので渡す
+      const pairNum =
+        (a === b) ? a :
+        (a === c) ? a :
+        b;
+      winPair(pairNum);
+      break;
+    }
+    case "green": winGreen(); break;
+    case "lose":
+    default:
+      // ハズレは前回色を残さない
+      clearFxClasses();
+      break;
   }
+
+  // 履歴へ通知（CustomEvent）
+  window.dispatchEvent(new CustomEvent("slot:result", {
+    detail: { kind, digits: [a, b, c] }
+  }));
 }
