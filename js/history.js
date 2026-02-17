@@ -47,6 +47,11 @@ function save(items) {
   }
 }
 
+function updateCount(countEl, items) {
+  if (!countEl) return;
+  countEl.textContent = `${items.length}/${MAX_ITEMS}`;
+}
+
 function render(listEl, items) {
   listEl.innerHTML = "";
   items.forEach((it) => {
@@ -77,22 +82,26 @@ function render(listEl, items) {
 export function initHistory() {
   const listEl = document.getElementById("historyList");
   const clearBtn = document.getElementById("clearHistoryBtn");
+  const countEl = document.getElementById("historyCount");
   if (!listEl || !clearBtn) return;
 
   let items = load();
   render(listEl, items);
+  updateCount(countEl, items); // 初期表示
 
   function push(kind, digits) {
     const entry = { kind, digits, time: nowTimeStr() };
     items = [entry, ...items].slice(0, MAX_ITEMS);
     save(items);
     render(listEl, items);
+    updateCount(countEl, items); // 追加後
   }
 
   clearBtn.addEventListener("click", () => {
     items = [];
     save(items);
     render(listEl, items);
+    updateCount(countEl, items); // クリア後（0/MAX）
   });
 
   // slot.js から dispatch されるイベントを受け取る
